@@ -1,0 +1,13 @@
+import React from 'react';
+import { Bell, CalendarDays, CheckCircle2, IdCard, LockKeyhole, Mail, Settings, ShieldCheck, UserRound, UsersRound } from 'lucide-react';
+import { useDemo } from '../context/DemoContext.jsx';
+import { Avatar, Card, Pill, SectionTitle, Alert } from '../components/UI.jsx';
+
+export default function EmployeeProfile(){
+  const {notify}=useDemo();
+  const [notifications,setNotifications]=React.useState(true);
+  const [mfa,setMfa]=React.useState(false);
+  return <><div className="page-heading"><div><span className="eyebrow">ACCOUNT AND SETTINGS</span><h1>My Profile</h1><p>View your personal information and manage your account preferences.</p></div></div>
+  <div className="profile-layout"><Card className="profile-card"><div className="profile-cover"/><div className="profile-details"><Avatar name="Ebrahim Ghareeb" size="xl"/><h2>Ebrahim Ghareeb</h2><Pill tone="blue">Employee</Pill><dl><div><dt><IdCard size={17}/> Employee ID</dt><dd>CT104</dd></div><div><dt><UsersRound size={17}/> Department</dt><dd>IT Solutions</dd></div><div><dt><UserRound size={17}/> Job Title</dt><dd>UX Designer</dd></div><div><dt><Mail size={17}/> Email</dt><dd>employee@cloudtrek.demo</dd></div></dl></div></Card>
+  <div className="profile-panels"><Card><SectionTitle icon={Settings}>Account Settings</SectionTitle><button className="setting-row" onClick={()=>notify('Password change requires real Cognito integration.')}><LockKeyhole size={19}/><div><strong>Change Password</strong><small>Available after connecting Amazon Cognito</small></div><span>›</span></button><div className="setting-row"><Bell size={19}/><div><strong>Notifications</strong><small>Toggle local preference for the demo</small></div><label className="switch"><input type="checkbox" checked={notifications} onChange={e=>setNotifications(e.target.checked)}/><span/></label></div><div className="setting-row"><ShieldCheck size={19}/><div><strong>Two-Factor Authentication</strong><small>Visual preference only; not enforcing MFA</small></div><label className="switch"><input type="checkbox" checked={mfa} onChange={e=>setMfa(e.target.checked)}/><span/></label></div></Card><Alert>Attendance timestamps cannot be edited on this page. Use Attendance History to request a correction.</Alert><Card><SectionTitle icon={CalendarDays}>Work Information</SectionTitle><dl className="simple-dl"><div><dt>Department</dt><dd>IT Solutions</dd></div><div><dt>Employment Type</dt><dd>Full-time</dd></div><div><dt>Office</dt><dd>Bahrain Office (demo)</dd></div><div><dt>Attendance Method</dt><dd>QR and geofencing (planned)</dd></div></dl></Card></div></div></>;
+}
