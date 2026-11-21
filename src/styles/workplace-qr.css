@@ -1,0 +1,54 @@
+/* CloudTrek QR display + mobile attendance link. Independent of existing dashboard CSS. */
+.qr-office-page, .qr-instructions {
+  padding: clamp(20px, 4vw, 52px);
+  max-width: 1050px;
+  margin-inline: auto;
+  color: #11264a;
+}
+.qr-office-page { text-align: center; }
+.qr-eyebrow { color: #2067df; font-size: .78rem; letter-spacing: .12em; font-weight: 800; }
+.qr-office-page h1, .qr-instructions h1, .qr-phone-card h1 { font-size: clamp(1.8rem, 3vw, 2.4rem); margin: 12px 0; }
+.qr-subtitle { color: #60718e; line-height: 1.5; }
+.qr-office-card, .qr-phone-card, .qr-steps {
+  background: #fff;
+  border: 1px solid #dbe5f3;
+  border-radius: 22px;
+  box-shadow: 0 14px 40px rgba(12, 46, 97, .08);
+}
+.qr-office-card { margin: 25px auto 16px; padding: 30px; max-width: 510px; }
+.qr-office-card h2 { margin: 0 0 14px; }
+.qr-display-image { display: block; max-width: 100%; margin: 0 auto; image-rendering: pixelated; }
+.qr-countdown { font-size: 1.05rem; color: #1d4c9d; }
+.qr-disclaimer { font-size: .86rem; color: #687995; line-height: 1.5; margin-top: 22px; }
+.qr-error { color: #a11c2d; background: #ffeded; padding: 12px 14px; border-radius: 10px; line-height: 1.45; }
+.qr-notice { color: #815600; background: #fff7df; padding: 12px 14px; border-radius: 10px; line-height: 1.45; }
+.qr-phone-page {
+  background: linear-gradient(160deg, #eaf3ff, #f8fbff);
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 15px;
+  color: #11264a;
+}
+.qr-phone-card { padding: 30px 24px; width: min(100%, 440px); }
+.qr-phone-card h1 { font-size: 1.75rem; }
+.qr-mark { font-size: 2.6rem; color: #2067df; }
+.qr-summary { display: grid; gap: 0; background: #f1f6fe; padding: 9px 16px; border-radius: 14px; margin: 22px 0; }
+.qr-summary > div { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 13px 0; border-bottom: 1px solid #dee8f5; }
+.qr-summary > div:last-child { border: 0; }
+.qr-summary span { color: #657894; font-size: .9rem; }
+.qr-summary strong { font-size: .86rem; text-align: right; overflow-wrap: anywhere; }
+.qr-action-label { display: block; font-weight: 700; margin: 20px 0 10px; }
+.qr-action-switch { display: flex; gap: 10px; }
+.qr-action-switch button { flex: 1; border: 1px solid #b9cde8; background: white; padding: 14px 10px; border-radius: 11px; font-weight: 700; color: #2d4f81; cursor: pointer; }
+.qr-action-switch button.selected { color: white; background: #1769e8; border-color: #1769e8; }
+.qr-confirm-button { width: 100%; background: #1769e8; color: white; border: none; border-radius: 12px; padding: 16px; font-size: 1rem; font-weight: 800; cursor: pointer; margin-top: 22px; }
+.qr-confirm-button:disabled { cursor: not-allowed; opacity: .5; }
+.qr-steps { padding: 24px 24px 24px 45px; line-height: 1.8; }
+.qr-steps li { margin-bottom: 9px; }
+@media (max-width: 520px) {
+  .qr-office-card { padding: 16px; }
+  .qr-phone-card { padding: 24px 18px; }
+  .qr-summary > div { align-items: flex-start; }
+}

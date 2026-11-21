@@ -15,6 +15,9 @@ import ManagerAttendance from './pages/ManagerAttendance.jsx';
 import Requests from './pages/Requests.jsx';
 import Reports from './pages/Reports.jsx';
 import ManagerProfile from './pages/ManagerProfile.jsx';
+import WorkplaceQR from "./pages/WorkplaceQR.jsx";
+import AttendanceScan from "./pages/AttendanceScan.jsx";
+import ScanInstructions from "./pages/ScanInstructions.jsx";
 
 function RoleGate({role}){
   const {role:activeRole}=useDemo();
@@ -28,18 +31,41 @@ export default function App(){
   if(!ready) return <div className="app-loading" role="status">Loading CloudTrek authentication…</div>;
   if(mode === 'cognito' && account && !role) return <div className="access-denied"><h1>Account access not assigned</h1><p>Your Cognito user is not a member of the <strong>employee</strong> or <strong>manager</strong> group. Please contact your administrator.</p><button className="btn btn-outline" onClick={()=>void logout()}>Sign out</button></div>;
   return <Routes>
+    <Route path="/attendance/scan"element={<AttendanceScan />}/>
     <Route path="/" element={<Navigate to={role?`/${role}/dashboard`:'/login'} replace/>}/>
-    <Route path="/login" element={role?<Navigate to={`/${role}/dashboard`} replace/>:<Login/>}/>
+    
+<Route
+  path="/login"
+  element={
+    role ? (
+      <Navigate
+        to={
+          role === "employee" &&
+          sessionStorage.getItem("cloudtrek-pending-attendance-qr")
+            ? "/attendance/scan"
+            : `/${role}/dashboard`
+        }
+        replace
+      />
+    ) : (
+      <Login />
+    )
+  }
+/>
+
+
     <Route path="/employee" element={<RoleGate role="employee"/>}>
       <Route index element={<Navigate to="dashboard" replace/>}/>
       <Route path="dashboard" element={<EmployeeDashboard/>}/>
-      <Route path="scan" element={<ScanQR/>}/>
+      <Route path="scan"element={<ScanInstructions />}/>
       <Route path="confirmation" element={<AttendanceConfirmation/>}/>
       <Route path="history" element={<AttendanceHistory/>}/>
       <Route path="profile" element={<EmployeeProfile/>}/>
     </Route>
+
     <Route path="/manager" element={<RoleGate role="manager"/>}>
       <Route index element={<Navigate to="dashboard" replace/>}/>
+      <Route path="workplace-qr" element={<WorkplaceQR />} />
       <Route path="dashboard" element={<ManagerDashboard/>}/>
       <Route path="team" element={<MyTeam/>}/>
       <Route path="attendance" element={<ManagerAttendance/>}/>
@@ -47,6 +73,7 @@ export default function App(){
       <Route path="reports" element={<Reports/>}/>
       <Route path="profile" element={<ManagerProfile/>}/>
     </Route>
+
     <Route path="*" element={<Navigate to="/" replace/>}/>
   </Routes>;
 }
