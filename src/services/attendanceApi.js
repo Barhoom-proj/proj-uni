@@ -12,72 +12,64 @@ export async function submitAttendance({
   longitude,
   accuracy
 }) {
-  // 1. Check API configuration
+  // 1. Verify API configuration
   if (!API_BASE_URL) {
     throw new Error("AWS attendance API is not configured.");
   }
 
-  // 2. Validate the requested action
+  // 2. Validate the attendance action
   if (action !== "check-in" && action !== "check-out") {
     throw new Error("Invalid attendance action.");
   }
 
-  // Check-out Lambda will be implemented next
-  if (action === "check-out") {
-    throw new Error(
-      "Check-out is not connected yet. Please use Check In."
-    );
-  }
-
-  // 3. Check QR token
+  // 3. Validate QR token
   if (!qrToken) {
-    throw new Error(
-      "QR code is missing. Please scan the workplace QR again."
-    );
+    throw new Error("Please scan the workplace QR again.");
   }
 
-  // 4. Retrieve the Cognito access token
+  // 4. Retrieve Cognito access token
   const session = await fetchAuthSession();
 
   const accessToken =
     session.tokens?.accessToken?.toString();
 
   if (!accessToken) {
-    throw new Error(
-      "Your login session has expired. Please sign in again."
-    );
+    throw new Error("Please sign in again.");
   }
 
-  // 5. Prepare attendance request
-  const requestBody = {
-    qrToken,
-    location: {
-      latitude,
-      longitude,
-      accuracy
-    }
-  };
+  // 5. Select the correct API endpoint
+  const endpoint =
+    action === "check-in"
+      ? "/attendance/check-in"
+      : "/attendance/check-out";
 
-  // 6. Send request to AWS API Gateway
+  // 6. Send attendance request to AWS
   const apiResponse = await fetch(
-    `${API_BASE_URL}/attendance/check-in`,
+    `${API_BASE_URL}${endpoint}`,
     {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        qrToken,
+        location: {
+          latitude,
+          longitude,
+          accuracy
+        }
+      }),
       cache: "no-store"
     }
   );
 
-  // 7. Read backend response
+  // 7. Read the response
   const result = await apiResponse
     .json()
     .catch(() => ({}));
 
-  // 8. Handle rejected attendance requests
+  // 8. Handle errors
   if (!apiResponse.ok) {
     throw new Error(
       result.message ||
@@ -85,16 +77,16 @@ export async function submitAttendance({
     );
   }
 
-  // 9. Require confirmation from AWS
+  // 9. Verify successful database recording
   if (
     result.attendanceId == null ||
     !result.recordedAt
   ) {
     throw new Error(
-      "AWS did not confirm that attendance was saved."
+      "AWS did not confirm the attendance record."
     );
   }
 
-  // 10. Return successful attendance record
+  // 10. Return the result
   return result;
 }

@@ -348,10 +348,13 @@ export const handler = async event => {
       });
     }
 
-    console.error(
-      "Check-in error:",
-      error.code || "UNKNOWN"
-    );
+console.error("Check-in database error:", {
+  code: error.code,
+  errno: error.errno,
+  sqlState: error.sqlState,
+  message: error.message
+});
+
 
     return response(500, {
       message: "Unable to record attendance."
