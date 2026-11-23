@@ -18,6 +18,7 @@ import ManagerProfile from './pages/ManagerProfile.jsx';
 import WorkplaceQR from "./pages/WorkplaceQR.jsx";
 import AttendanceScan from "./pages/AttendanceScan.jsx";
 import ScanInstructions from "./pages/ScanInstructions.jsx";
+import WorkplaceQRDisplay from "./pages/WorkplaceQRDisplay";
 
 function RoleGate({role}){
   const {role:activeRole}=useDemo();
@@ -31,6 +32,15 @@ export default function App(){
   if(!ready) return <div className="app-loading" role="status">Loading CloudTrek authentication…</div>;
   if(mode === 'cognito' && account && !role) return <div className="access-denied"><h1>Account access not assigned</h1><p>Your Cognito user is not a member of the <strong>employee</strong> or <strong>manager</strong> group. Please contact your administrator.</p><button className="btn btn-outline" onClick={()=>void logout()}>Sign out</button></div>;
   return <Routes>
+    <Route
+  path="/workplace/qr-display"
+  element={<WorkplaceQRDisplay />}
+/>
+
+<Route
+  path="/attendance/scan"
+  element={<AttendanceScan />}
+/>
     <Route path="/attendance/scan"element={<AttendanceScan />}/>
     <Route path="/" element={<Navigate to={role?`/${role}/dashboard`:'/login'} replace/>}/>
     

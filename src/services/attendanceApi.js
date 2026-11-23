@@ -1,30 +1,100 @@
-import { fetchAuthSession } from 'aws-amplify/auth';
-import { isAttendanceApiConfigured, isCognitoConfigured } from '../awsConfig.js';
 
-/**
- * Requires your own API Gateway/Lambda implementation.
- * IMPORTANT: The Lambda must independently validate the authenticated user,
- * QR token, workplace radius, time and duplicate attendance. Never trust this client.
- * Expected success payload: { attendanceId: string, recordedAt: ISO8601 string, status?: string }
- */
-export async function submitAttendance({ action, qrToken, latitude, longitude, accuracy }) {
-  if (!isCognitoConfigured) throw new Error('Enable Amazon Cognito before submitting real attendance.');
-  if (!isAttendanceApiConfigured) throw new Error('AWS attendance API is not configured yet. Scanning alone does not record attendance.');
-  const session = await fetchAuthSession();
-  const token = session.tokens?.accessToken?.toString();
-  if (!token) throw new Error('Your session has expired. Please sign in again.');
-  const path = action === 'check-out' ? '/attendance/check-out' : '/attendance/check-in';
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ qrToken, location: { latitude, longitude, accuracy } }),
-  });
-  if (!response.ok) {
-    let message = `Attendance rejected (${response.status}).`;
-    try { const body = await response.json(); if (body.message) message = body.message; } catch { /* no response JSON */ }
-    throw new Error(message);
+import { fetchAuthSession } from "aws-amplify/auth";
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || ""
+).replace(/\/+$/, "");
+
+export async function submitAttendance({
+  action,
+  qrToken,
+  latitude,
+  longitude,
+  accuracy
+}) {
+  // 1. Check API configuration
+  if (!API_BASE_URL) {
+    throw new Error("AWS attendance API is not configured.");
   }
-  const result = await response.json();
-  if (!result.attendanceId || !result.recordedAt) throw new Error('Backend response is missing attendanceId or recordedAt. Attendance confirmation cannot be shown.');
+
+  // 2. Validate the requested action
+  if (action !== "check-in" && action !== "check-out") {
+    throw new Error("Invalid attendance action.");
+  }
+
+  // Check-out Lambda will be implemented next
+  if (action === "check-out") {
+    throw new Error(
+      "Check-out is not connected yet. Please use Check In."
+    );
+  }
+
+  // 3. Check QR token
+  if (!qrToken) {
+    throw new Error(
+      "QR code is missing. Please scan the workplace QR again."
+    );
+  }
+
+  // 4. Retrieve the Cognito access token
+  const session = await fetchAuthSession();
+
+  const accessToken =
+    session.tokens?.accessToken?.toString();
+
+  if (!accessToken) {
+    throw new Error(
+      "Your login session has expired. Please sign in again."
+    );
+  }
+
+  // 5. Prepare attendance request
+  const requestBody = {
+    qrToken,
+    location: {
+      latitude,
+      longitude,
+      accuracy
+    }
+  };
+
+  // 6. Send request to AWS API Gateway
+  const apiResponse = await fetch(
+    `${API_BASE_URL}/attendance/check-in`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(requestBody),
+      cache: "no-store"
+    }
+  );
+
+  // 7. Read backend response
+  const result = await apiResponse
+    .json()
+    .catch(() => ({}));
+
+  // 8. Handle rejected attendance requests
+  if (!apiResponse.ok) {
+    throw new Error(
+      result.message ||
+      `Attendance request failed (HTTP ${apiResponse.status}).`
+    );
+  }
+
+  // 9. Require confirmation from AWS
+  if (
+    result.attendanceId == null ||
+    !result.recordedAt
+  ) {
+    throw new Error(
+      "AWS did not confirm that attendance was saved."
+    );
+  }
+
+  // 10. Return successful attendance record
   return result;
 }
