@@ -49,7 +49,6 @@ export function DemoProvider({children}) {
     const clock=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     const current=data.attendance.find(r=>r.employeeId==='CT104'&&r.date===date);
     if(action==='check-in' && current?.checkIn) return {ok:false,message:'You have already checked in today.'};
-    if(action==='check-out' && !current?.checkIn) return {ok:false,message:'Check in before checking out.'};
     if(action==='check-out' && current?.checkOut) return {ok:false,message:'You have already checked out today.'};
     setData(prev=>{
       const found=prev.attendance.find(r=>r.employeeId==='CT104'&&r.date===date);

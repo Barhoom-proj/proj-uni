@@ -90,3 +90,56 @@ export async function submitAttendance({
   // 10. Return the result
   return result;
 }
+
+export async function getAttendanceHistory() {
+  // 1. Get API Gateway URL
+  const baseURL = (
+    import.meta.env.VITE_API_BASE_URL || ""
+  ).replace(/\/+$/, "");
+
+  if (!baseURL) {
+    throw new Error("Attendance API is not configured.");
+  }
+
+  // 2. Get authenticated Cognito session
+  const session = await fetchAuthSession();
+
+  const accessToken =
+    session.tokens?.accessToken?.toString();
+
+  if (!accessToken) {
+    throw new Error("Please sign in again.");
+  }
+
+  // 3. Request attendance history from AWS
+  const response = await fetch(
+    `${baseURL}/attendance/history`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      },
+      cache: "no-store"
+    }
+  );
+
+  // 4. Read the API response
+  const result = await response.json().catch(() => ({}));
+
+  // 5. Handle API errors
+  if (!response.ok) {
+    throw new Error(
+      result.message ||
+      `Unable to load history (HTTP ${response.status}).`
+    );
+  }
+
+  // 6. Validate returned records
+  if (!Array.isArray(result.records)) {
+    throw new Error("Invalid attendance history response.");
+  }
+
+  // 7. Return real attendance records
+  return result.records;
+}
+
