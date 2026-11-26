@@ -19,6 +19,7 @@ import WorkplaceQR from "./pages/WorkplaceQR.jsx";
 import AttendanceScan from "./pages/AttendanceScan.jsx";
 import ScanInstructions from "./pages/ScanInstructions.jsx";
 import WorkplaceQRDisplay from "./pages/WorkplaceQRDisplay";
+import EmployeeCorrections from "./pages/EmployeeCorrections.jsx";
 
 function RoleGate({role}){
   const {role:activeRole}=useDemo();
@@ -70,6 +71,10 @@ export default function App(){
       <Route path="scan"element={<ScanInstructions />}/>
       <Route path="confirmation" element={<AttendanceConfirmation/>}/>
       <Route path="history" element={<AttendanceHistory/>}/>
+      <Route
+  path="corrections"
+  element={<EmployeeCorrections />}
+/>
       <Route path="profile" element={<EmployeeProfile/>}/>
     </Route>
 

@@ -1,4 +1,4 @@
-
+import { Link } from "react-router-dom";
 import React from "react";
 import {
   CalendarDays,
@@ -224,6 +224,13 @@ export default function AttendanceHistory() {
           </span>
 
           <h1>Attendance History</h1>
+
+          <Link
+  to="/employee/corrections"
+  className="btn btn-outline"
+>
+  My Correction Requests
+</Link>
 
           <p>
             Review past attendance, working hours,
