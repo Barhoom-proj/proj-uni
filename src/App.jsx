@@ -20,6 +20,8 @@ import AttendanceScan from "./pages/AttendanceScan.jsx";
 import ScanInstructions from "./pages/ScanInstructions.jsx";
 import WorkplaceQRDisplay from "./pages/WorkplaceQRDisplay";
 import EmployeeCorrections from "./pages/EmployeeCorrections.jsx";
+import WorkSchedules from "./pages/WorkSchedules.jsx";
+import DailyAttendanceStatus from "./pages/DailyAttendanceStatus.jsx";
 
 function RoleGate({role}){
   const {role:activeRole}=useDemo();
@@ -87,6 +89,15 @@ export default function App(){
       <Route path="requests" element={<Requests/>}/>
       <Route path="reports" element={<Reports/>}/>
       <Route path="profile" element={<ManagerProfile/>}/>
+      <Route
+  path="schedules"
+  element={<WorkSchedules />}
+/>
+
+<Route
+  path="daily-attendance"
+  element={<DailyAttendanceStatus />}
+/>
     </Route>
 
     <Route path="*" element={<Navigate to="/" replace/>}/>
