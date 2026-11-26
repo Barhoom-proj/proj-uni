@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Link } from "react-router-dom";
 
@@ -9,7 +8,8 @@ import {
   CalendarDays,
   ChartNoAxesCombined,
   Clock3,
-  UsersRound
+  UsersRound,
+  XCircle
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext.jsx";
@@ -19,40 +19,32 @@ import {
 } from "../services/managerAttendanceApi.js";
 
 import {
+  getManagerDailyAttendance
+} from "../services/dailyAttendanceApi.js";
+
+import {
   Card,
   SectionTitle,
   StatCard
 } from "../components/UI.jsx";
 
-// Get today's date in Bahrain.
+// Get today's date in Bahrain
 function todayBahrain() {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Bahrain",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(new Date());
-
-  const values = Object.fromEntries(
-    parts.map(part => [part.type, part.value])
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Bahrain",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    })
+      .formatToParts(new Date())
+      .map(({ type, value }) => [type, value])
   );
 
-  return `${values.year}-${values.month}-${values.day}`;
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-// Format UTC timestamps in Bahrain time.
-function formatTime(value) {
-  if (!value) return "—";
-
-  return new Date(value).toLocaleTimeString("en-US", {
-    timeZone: "Asia/Bahrain",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true
-  });
-}
-
-// Format attendance date.
+// Format attendance date
 function formatDate(value) {
   if (!value) return "—";
 
@@ -65,7 +57,22 @@ function formatDate(value) {
     });
 }
 
-// Format working hours.
+// Convert UTC attendance timestamps to Bahrain time
+function formatTime(value) {
+  if (!value) return "—";
+
+  return new Date(value).toLocaleTimeString(
+    "en-US",
+    {
+      timeZone: "Asia/Bahrain",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    }
+  );
+}
+
+// Format recorded working hours
 function formatDuration(seconds) {
   if (seconds == null) return "—";
 
@@ -75,17 +82,36 @@ function formatDuration(seconds) {
   return `${hours}h ${String(minutes).padStart(2, "0")}m`;
 }
 
+// Protect chart percentages against division by zero
+function percentage(value, total) {
+  if (total <= 0) return 0;
+
+  return Math.min(
+    100,
+    Math.max(0, (value / total) * 100)
+  );
+}
+
 export default function ManagerDashboard() {
   const { account } = useAuth();
 
+  // Real attendance records
   const [records, setRecords] = React.useState([]);
-  const [employeeCount, setEmployeeCount] = React.useState(0);
 
+  // Real schedule-based daily attendance
+  const [dailyData, setDailyData] = React.useState(null);
+
+  const [employeeCount, setEmployeeCount] =
+    React.useState(0);
+
+  // Page state
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
   const [refresh, setRefresh] = React.useState(0);
 
-  // Retrieve manager attendance records from AWS.
+  const today = todayBahrain();
+
+  // Load both AWS APIs
   React.useEffect(() => {
     let active = true;
 
@@ -94,15 +120,29 @@ export default function ManagerDashboard() {
       setError("");
 
       try {
-        const data = await getManagerAttendance();
+        const [
+          attendanceResult,
+          dailyResult
+        ] = await Promise.all([
+          getManagerAttendance(),
+          getManagerDailyAttendance(today)
+        ]);
 
-        if (active) {
-          setRecords(data.records);
-          setEmployeeCount(data.employeeCount);
-        }
+        if (!active) return;
+
+        setRecords(attendanceResult.records);
+        setEmployeeCount(
+          attendanceResult.employeeCount
+        );
+
+        setDailyData(dailyResult);
+
       } catch (err) {
         if (active) {
-          setError(err.message);
+          setError(
+            err.message ||
+            "Unable to retrieve dashboard data."
+          );
         }
       } finally {
         if (active) {
@@ -116,13 +156,13 @@ export default function ManagerDashboard() {
     return () => {
       active = false;
     };
-  }, [refresh]);
+  }, [today, refresh]);
 
   if (loading) {
     return (
       <div className="page-heading">
         <h1>Manager Dashboard</h1>
-        <p>Loading team attendance from AWS...</p>
+        <p>Loading attendance data from AWS...</p>
       </div>
     );
   }
@@ -132,13 +172,17 @@ export default function ManagerDashboard() {
       <div className="page-heading">
         <h1>Manager Dashboard</h1>
 
-        <p role="alert" style={{ color: "#c62828" }}>
+        <p
+          role="alert"
+          style={{ color: "#c62828" }}
+        >
           {error}
         </p>
 
         <button
           type="button"
-          onClick={() => setRefresh(value => value + 1)}
+          className="btn btn-outline"
+          onClick={() => setRefresh(v => v + 1)}
         >
           Retry
         </button>
@@ -146,71 +190,86 @@ export default function ManagerDashboard() {
     );
   }
 
-  // Today's saved attendance records.
-  const today = todayBahrain();
+  // Real status counts from the Daily Attendance Lambda
+  const summary = dailyData?.summary || {};
 
-  const todayRecords = records.filter(
-    record => record.date === today
-  );
+  const totalTeam =
+    Number(summary.totalEmployees ?? employeeCount);
 
-  const checkedInToday = new Set(
-    todayRecords.map(record => record.employeeId)
-  ).size;
+  const scheduled =
+    Number(summary.scheduledEmployees || 0);
 
-  const checkedOutToday = new Set(
-    todayRecords
-      .filter(record => record.checkOutAt)
-      .map(record => record.employeeId)
-  ).size;
+  const present = Number(summary.present || 0);
+  const late = Number(summary.late || 0);
+  const absent = Number(summary.absent || 0);
 
-  // No record does not necessarily mean absent.
-  const noCheckInToday = Math.max(
+  const awaiting =
+    Number(summary.awaitingCheckIn || 0);
+
+  const upcoming =
+    Number(summary.upcoming || 0);
+
+  // Employees with a scheduled shift but not yet
+  // classified Present, Late, or Absent
+  const otherScheduled = Math.max(
     0,
-    employeeCount - checkedInToday
+    scheduled - present - late - absent
   );
 
-  // Calculate Monday of the current week.
+  // Build weekly check-in activity from real records.
+  // This chart counts check-ins, not lateness or absence.
   const monday = new Date(`${today}T12:00:00Z`);
 
-  const offset = (monday.getUTCDay() + 6) % 7;
-  monday.setUTCDate(monday.getUTCDate() - offset);
+  monday.setUTCDate(
+    monday.getUTCDate() -
+    ((monday.getUTCDay() + 6) % 7)
+  );
 
-  // Weekly overview: Monday through Friday.
   const week = Array.from({ length: 5 }, (_, index) => {
     const date = new Date(monday);
-    date.setUTCDate(monday.getUTCDate() + index);
+
+    date.setUTCDate(
+      monday.getUTCDate() + index
+    );
 
     const dateString = date.toISOString().slice(0, 10);
 
     const dayRecords = records.filter(
-      record => record.date === dateString
+      record =>
+        record.date === dateString &&
+        Boolean(record.checkInAt)
     );
 
-    const employeeIds = new Set(
+    const checkedIn = new Set(
       dayRecords.map(record => record.employeeId)
-    );
+    ).size;
 
     return {
       label: ["Mon", "Tue", "Wed", "Thu", "Fri"][index],
-      checkedIn: employeeIds.size
+      checkedIn
     };
   });
 
-  // Latest attendance records.
+  // Latest actual attendance records
   const recent = [...records]
     .sort((a, b) =>
-      (b.checkInAt || "").localeCompare(a.checkInAt || "")
+      (b.checkInAt || "").localeCompare(
+        a.checkInAt || ""
+      )
     )
     .slice(0, 6);
 
-  // Donut chart values.
-  const checkedInPercent = employeeCount > 0
-    ? Math.min(100, checkedInToday / employeeCount * 100)
-    : 0;
+  // Donut chart percentages (scheduled employees only)
+  const presentPct = percentage(present, scheduled);
+  const latePct = percentage(late, scheduled);
+  const absentPct = percentage(absent, scheduled);
+
+  const lateEnd = presentPct + latePct;
+  const absentEnd = lateEnd + absentPct;
 
   return (
     <>
-      {/* Welcome section */}
+      {/* Welcome banner */}
       <div className="welcome-banner manager-welcome">
         <div>
           <span className="eyebrow">
@@ -225,8 +284,8 @@ export default function ManagerDashboard() {
           </h1>
 
           <p>
-            View your team's real attendance records
-            and daily activity.
+            Monitor your team's attendance using real
+            employee schedules and recorded check-ins.
           </p>
         </div>
 
@@ -236,35 +295,39 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-      {/* Summary cards */}
+      {/* Real attendance statistics */}
       <div className="stat-grid four">
 
         <StatCard
           label="Total Team"
-          value={employeeCount}
+          value={totalTeam}
+          sub={`${scheduled} scheduled today`}
           icon={UsersRound}
           tone="blue"
         />
 
         <StatCard
-          label="Checked In Today"
-          value={checkedInToday}
+          label="Present"
+          value={present}
+          sub="On-time check-ins"
           icon={CalendarDays}
           tone="green"
         />
 
         <StatCard
-          label="Checked Out Today"
-          value={checkedOutToday}
+          label="Late"
+          value={late}
+          sub="After grace period"
           icon={Clock3}
-          tone="blue"
+          tone="amber"
         />
 
         <StatCard
-          label="No Check-In Today"
-          value={noCheckInToday}
-          icon={CalendarClock}
-          tone="amber"
+          label="Absent"
+          value={absent}
+          sub="No check-in after shift"
+          icon={XCircle}
+          tone="red"
         />
 
       </div>
@@ -272,33 +335,29 @@ export default function ManagerDashboard() {
       <div className="manager-main-grid">
         <div className="manager-primary">
 
-          {/* Charts */}
           <div className="two-column manager-charts">
 
-            {/* Weekly attendance */}
+            {/* Weekly check-in chart */}
             <Card>
               <SectionTitle icon={ChartNoAxesCombined}>
-                Weekly Attendance Overview
+                Weekly Check-In Activity
               </SectionTitle>
 
               <div className="group-bars">
                 {week.map(day => (
                   <div
-                    key={day.label}
                     className="group-bar-item"
+                    key={day.label}
                   >
                     <div className="group-bar">
                       <div
                         className="bar-p"
                         style={{
-                          height: `${
-                            employeeCount > 0
-                              ? Math.min(
-                                  100,
-                                  day.checkedIn / employeeCount * 100
-                                )
-                              : 0
-                          }%`
+                          height:
+                            `${percentage(
+                              day.checkedIn,
+                              totalTeam
+                            )}%`
                         }}
                         title={
                           `${day.checkedIn} employees checked in`
@@ -317,11 +376,27 @@ export default function ManagerDashboard() {
                   Employees checked in
                 </span>
               </div>
+
+              <p className="footnote">
+                Based on saved check-ins from the
+                recent attendance records.
+              </p>
             </Card>
 
-            {/* Today's team status */}
+            {/* Today's schedule-based attendance chart */}
             <Card>
-              <SectionTitle icon={UsersRound}>
+              <SectionTitle
+                icon={UsersRound}
+                action={
+                  <Link
+                    to="/manager/daily-attendance"
+                    className="text-link"
+                  >
+                    View Details
+                    <ArrowRight size={16} />
+                  </Link>
+                }
+              >
                 Today's Team Status
               </SectionTitle>
 
@@ -330,36 +405,49 @@ export default function ManagerDashboard() {
                   className="donut"
                   style={{
                     background: `conic-gradient(
-                      #2477ee 0% ${checkedInPercent}%,
-                      #e2e8f0 ${checkedInPercent}% 100%
+                      #2477ee 0% ${presentPct}%,
+                      #f9b838 ${presentPct}% ${lateEnd}%,
+                      #f36377 ${lateEnd}% ${absentEnd}%,
+                      #e2e8f0 ${absentEnd}% 100%
                     )`
                   }}
                 >
                   <div>
-                    <strong>{employeeCount}</strong>
-                    <small>Employees</small>
+                    <strong>{scheduled}</strong>
+                    <small>Scheduled</small>
                   </div>
                 </div>
 
                 <div className="donut-legend">
                   <div>
                     <i className="legend-blue" />
-                    Checked In Today
-                    <strong>{checkedInToday}</strong>
+                    Present
+                    <strong>{present}</strong>
+                  </div>
+
+                  <div>
+                    <i className="legend-amber" />
+                    Late
+                    <strong>{late}</strong>
                   </div>
 
                   <div>
                     <i className="legend-red" />
-                    No Check-In Record
-                    <strong>{noCheckInToday}</strong>
+                    Absent
+                    <strong>{absent}</strong>
+                  </div>
+
+                  <div>
+                    Other / Pending
+                    <strong>{otherScheduled}</strong>
                   </div>
                 </div>
               </div>
-            </Card>
 
+            </Card>
           </div>
 
-          {/* Recent attendance table */}
+          {/* Recent attendance records */}
           <Card>
             <SectionTitle
               icon={CalendarClock}
@@ -385,16 +473,20 @@ export default function ManagerDashboard() {
                     <th>Check-In</th>
                     <th>Check-Out</th>
                     <th>Hours</th>
-                    <th>Status</th>
+                    <th>Session</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {recent.map(record => (
                     <tr key={record.id}>
-                      <td>{record.employeeName}</td>
+                      <td>
+                        {record.employeeName}
+                      </td>
 
-                      <td>{formatDate(record.date)}</td>
+                      <td>
+                        {formatDate(record.date)}
+                      </td>
 
                       <td>
                         {formatTime(record.checkInAt)}
@@ -410,7 +502,9 @@ export default function ManagerDashboard() {
                         )}
                       </td>
 
-                      <td>{record.status}</td>
+                      <td>
+                        {record.status}
+                      </td>
                     </tr>
                   ))}
 
@@ -428,19 +522,29 @@ export default function ManagerDashboard() {
 
         </div>
 
-        {/* Secondary cards */}
+        {/* Secondary information */}
         <div className="manager-secondary">
 
           <Card>
-            <SectionTitle icon={CalendarClock}>
-              Attendance Requests
+            <SectionTitle
+              icon={CalendarClock}
+              action={
+                <Link
+                  to="/manager/requests"
+                  className="text-link"
+                >
+                  View Requests
+                  <ArrowRight size={16} />
+                </Link>
+              }
+            >
+              Attendance Corrections
             </SectionTitle>
 
             <div className="request-compact">
               <p className="muted-text">
-                Attendance correction requests will
-                appear here once the request and approval
-                backend is implemented.
+                Review employee attendance correction
+                requests and approval decisions.
               </p>
             </div>
           </Card>
@@ -453,26 +557,33 @@ export default function ManagerDashboard() {
             <div className="notification-list">
               <p>
                 <span>●</span>
-                {checkedInToday} employees have
-                checked in today.
+                {late} employees arrived late today.
               </p>
 
               <p>
                 <span>●</span>
-                {checkedOutToday} employees have
-                checked out today.
+                {absent} employees have no check-in
+                after their scheduled shift ended.
               </p>
 
               <p>
                 <span>●</span>
-                {noCheckInToday} employees have no
-                check-in record today.
+                {awaiting + upcoming} scheduled
+                employees are awaiting their shift
+                or check-in.
               </p>
             </div>
           </Card>
 
         </div>
       </div>
+
+      <p className="footnote">
+        Attendance classifications are calculated
+        from employee schedules and saved check-ins.
+        Absence counts are provisional until approved
+        leave and holidays are integrated.
+      </p>
     </>
   );
 }
