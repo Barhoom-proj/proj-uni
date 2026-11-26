@@ -1,440 +1,222 @@
-import { Link } from "react-router-dom";
 import React from "react";
-import {
-  CalendarDays,
-  Clock3,
-  FilePenLine,
-  Hourglass,
-  XCircle
-} from "lucide-react";
+import { Link } from "react-router-dom";
+import { CalendarDays, Clock3, FilePenLine, Hourglass, XCircle } from "lucide-react";
+import { fullDate, formatHours } from "../data/demo.js";
+import { Card, Dialog, SectionTitle, StatCard } from "../components/UI.jsx";
+import { getAttendanceHistory } from "../services/attendanceApi.js";
+import { createCorrectionRequest } from "../services/correctionApi.js";
+import { getMyAttendanceStatuses } from "../services/myAttendanceStatusApi.js";
 
-import {
-  fullDate,
-  formatHours
-} from "../data/demo.js";
+function time(value) {
+  return value ? new Date(value).toLocaleTimeString("en-US", {
+    timeZone: "Asia/Bahrain", hour: "2-digit", minute: "2-digit", hour12: true
+  }) : "—";
+}
 
-import {
-  AttendanceTable,
-  Card,
-  Dialog,
-  SectionTitle,
-  StatCard
-} from "../components/UI.jsx";
-
-import {
-  getAttendanceHistory
-} from "../services/attendanceApi.js";
-
-import {
-  createCorrectionRequest
-} from "../services/correctionApi.js";
+function statusTone(status) {
+  if (status === "Present") return "#167d46";
+  if (status === "Late") return "#a96300";
+  if (status === "Absent") return "#c62828";
+  return "#526174";
+}
 
 export default function AttendanceHistory() {
+  const [records, setRecords] = React.useState([]);
+  const [statusData, setStatusData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState("");
+  const [month, setMonth] = React.useState("All");
   const [status, setStatus] = React.useState("All");
   const [selected, setSelected] = React.useState(null);
   const [reason, setReason] = React.useState("");
-  const [month, setMonth] = React.useState("All");
+  const [savingRequest, setSavingRequest] = React.useState(false);
+  const [requestError, setRequestError] = React.useState("");
+  const [requestSuccess, setRequestSuccess] = React.useState("");
+  const [refresh, setRefresh] = React.useState(0);
 
-  // Real AWS attendance records
-  const [records, setRecords] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState("");
-
-  // Real correction request states
-  const [savingRequest, setSavingRequest] =
-    React.useState(false);
-  const [requestError, setRequestError] =
-    React.useState("");
-  const [requestSuccess, setRequestSuccess] =
-    React.useState("");
-
-  // Load attendance records from AWS
   React.useEffect(() => {
     let active = true;
-
     async function loadHistory() {
       setLoading(true);
       setError("");
-
       try {
-        const data = await getAttendanceHistory();
-
+        const [history, daily] = await Promise.all([
+          getAttendanceHistory(), getMyAttendanceStatuses(90)
+        ]);
         if (active) {
-          setRecords(data);
+          setRecords(history);
+          setStatusData(daily);
         }
       } catch (err) {
-        if (active) {
-          setError(
-            err.message ||
-            "Unable to load attendance records."
-          );
-        }
+        if (active) setError(err.message || "Unable to load attendance history.");
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     }
-
     loadHistory();
+    return () => { active = false; };
+  }, [refresh]);
 
-    return () => {
-      active = false;
-    };
-  }, []);
+  const daily = statusData?.records || [];
+  const recentDates = new Set(daily.map(row => row.date));
 
-  // Convert UTC timestamps to Bahrain time
-  function formatTime(value) {
-    if (!value) return null;
-
-    return new Date(value).toLocaleTimeString(
-      "en-GB",
-      {
-        timeZone: "Asia/Bahrain",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false
-      }
-    );
-  }
-
-  // Convert AWS records for existing AttendanceTable
-  const mine = records
-    .map(record => ({
-      id: record.id,
-      date: record.date,
-      checkIn: formatTime(record.checkInAt),
-      checkOut: formatTime(record.checkOutAt),
-      durationSeconds: record.durationSeconds,
-      status: "Present"
-    }))
+  // Keep all scheduled days and real check-ins within the 90-day window.
+  // This includes days classified Absent, which have no attendance record ID.
+  const calendarRows = daily.filter(row => row.scheduled || row.attendanceId != null);
+  const olderRows = records
+    .filter(row => !recentDates.has(row.date))
+    .map(row => ({
+      date: row.date,
+      attendanceId: row.id,
+      checkInAt: row.checkInAt,
+      checkOutAt: row.checkOutAt,
+      durationSeconds: row.durationSeconds,
+      status: "Recorded (Outside Status Window)",
+      scheduled: false
+    }));
+  const allRows = [...calendarRows, ...olderRows]
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  // Month and status filters
-  const months = [
-    ...new Set(
-      mine.map(record => record.date.slice(0, 7))
-    )
-  ];
-
-  const filtered = mine.filter(record =>
-    (status === "All" || record.status === status) &&
-    (month === "All" || record.date.startsWith(month))
+  const months = [...new Set(allRows.map(row => row.date.slice(0, 7)))];
+  const statuses = [...new Set(allRows.map(row => row.status))];
+  const filtered = allRows.filter(row =>
+    (month === "All" || row.date.startsWith(month)) &&
+    (status === "All" || row.status === status)
+  );
+  const present = filtered.filter(row => row.status === "Present").length;
+  const late = filtered.filter(row => row.status === "Late").length;
+  const absent = filtered.filter(row => row.status === "Absent").length;
+  const recordedHours = filtered.reduce((total, row) =>
+    total + (Number(row.durationSeconds) || 0) / 3600, 0
   );
 
-  // Attendance statistics
-  const present = filtered.filter(
-    record => record.status === "Present"
-  ).length;
-
-  const late = filtered.filter(
-    record => record.status === "Late"
-  ).length;
-
-  const absent = filtered.filter(
-    record => record.status === "Absent"
-  ).length;
-
-  const hours = filtered.reduce(
-    (total, record) =>
-      total +
-      (Number(record.durationSeconds) || 0) / 3600,
-    0
-  );
-
-  // Open correction request dialog
-  function openCorrection(record) {
-    setSelected(record);
+  function openCorrection(row) {
+    if (row.attendanceId == null) return;
+    setSelected(row);
     setReason("");
     setRequestError("");
     setRequestSuccess("");
   }
-
-  // Close correction dialog
   function closeCorrection() {
     if (savingRequest) return;
-
     setSelected(null);
     setReason("");
     setRequestError("");
   }
-
-  // Submit correction request to AWS
-  async function submit(e) {
-    e.preventDefault();
-
-    if (savingRequest) return;
-
-    if (selected?.id == null) {
-      setRequestError(
-        "Please select a valid attendance record."
-      );
+  async function submit(event) {
+    event.preventDefault();
+    if (savingRequest || selected?.attendanceId == null) return;
+    const trimmed = reason.trim();
+    if (trimmed.length < 10 || trimmed.length > 1000) {
+      setRequestError("Reason must be between 10 and 1000 characters.");
       return;
     }
-
-    const trimmedReason = reason.trim();
-
-    if (
-      trimmedReason.length < 10 ||
-      trimmedReason.length > 1000
-    ) {
-      setRequestError(
-        "Please enter a reason between 10 and 1000 characters."
-      );
-      return;
-    }
-
     setSavingRequest(true);
     setRequestError("");
-
     try {
-      // Submit the selected MySQL record ID
       const result = await createCorrectionRequest({
-        attendanceId: selected.id,
-        reason: trimmedReason
+        attendanceId: selected.attendanceId,
+        reason: trimmed
       });
-
-      // Display success only after AWS confirms saving
-      setRequestSuccess(
-        result.message ||
-        "Correction request submitted for manager review."
-      );
-
+      setRequestSuccess(result.message || "Correction request submitted for review.");
       setSelected(null);
       setReason("");
-
+      // The correction does not change attendance until a manager approves it.
     } catch (err) {
-      setRequestError(
-        err.message ||
-        "Unable to submit correction request."
-      );
-
+      setRequestError(err.message || "Unable to submit correction request.");
     } finally {
       setSavingRequest(false);
     }
   }
 
-  return (
-    <>
-      {/* Page heading */}
-      <div className="page-heading">
-        <div>
-          <span className="eyebrow">
-            EMPLOYEE RECORDS
-          </span>
+  return <>
+    <div className="page-heading">
+      <div>
+        <span className="eyebrow">EMPLOYEE RECORDS</span>
+        <h1>Attendance History</h1>
+        <p>Review your schedule-based attendance status, recorded hours, and corrections.</p>
+      </div>
+      <Link className="btn btn-outline" to="/employee/corrections">My Correction Requests</Link>
+    </div>
 
-          <h1>Attendance History</h1>
+    <div className="stat-grid four">
+      <StatCard label="Present Days" value={present} icon={CalendarDays} tone="green"/>
+      <StatCard label="Late Days" value={late} icon={Clock3} tone="amber"/>
+      <StatCard label="Absent Days" value={absent} icon={XCircle} tone="red"/>
+      <StatCard label="Total Recorded Hours" value={formatHours(recordedHours)} icon={Hourglass} tone="blue"/>
+    </div>
 
-          <Link
-  to="/employee/corrections"
-  className="btn btn-outline"
->
-  My Correction Requests
-</Link>
-
-          <p>
-            Review past attendance, working hours,
-            and request a correction when needed.
-          </p>
+    <Card className="filter-card">
+      <div className="filters">
+        <div className="field">
+          <label htmlFor="history-month">Month</label>
+          <select id="history-month" value={month} onChange={e => setMonth(e.target.value)}>
+            <option value="All">All months</option>
+            {months.map(m => <option key={m} value={m}>
+              {new Date(`${m}-01T12:00:00Z`).toLocaleDateString("en-GB", {
+                timeZone: "UTC", month: "long", year: "numeric"
+              })}
+            </option>)}
+          </select>
         </div>
+        <div className="field">
+          <label htmlFor="history-status">Status</label>
+          <select id="history-status" value={status} onChange={e => setStatus(e.target.value)}>
+            <option value="All">All</option>
+            {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <button className="btn btn-outline" type="button" onClick={() => { setMonth("All"); setStatus("All"); }}>Clear Filters</button>
+        <button className="btn btn-outline" type="button" onClick={() => setRefresh(v => v + 1)}>Refresh</button>
       </div>
+    </Card>
 
-      {/* Attendance statistics */}
-      <div className="stat-grid four">
-        <StatCard
-          label="Present Days"
-          value={present}
-          icon={CalendarDays}
-          tone="green"
-        />
+    <Card>
+      <SectionTitle icon={CalendarDays}>Attendance Records</SectionTitle>
+      {loading && <p>Loading attendance records...</p>}
+      {error && <p role="alert" style={{ color: "#c62828" }}>{error}</p>}
+      {requestSuccess && <p role="status" style={{ color: "#167d46" }}>{requestSuccess}</p>}
+      {!loading && !error && <div className="table-wrap">
+        <table className="data-table">
+          <thead><tr>
+            <th>Date</th><th>Check-In</th><th>Check-Out</th><th>Hours</th><th>Status</th><th>Action</th>
+          </tr></thead>
+          <tbody>
+            {filtered.map(row => <tr key={`${row.date}-${row.attendanceId || "unrecorded"}`}>
+              <td>{fullDate(row.date)}</td>
+              <td>{time(row.checkInAt)}</td>
+              <td>{time(row.checkOutAt)}</td>
+              <td>{row.durationSeconds == null ? "—" : formatHours(row.durationSeconds / 3600)}</td>
+              <td><span style={{ color: statusTone(row.status), fontWeight: 600 }}>{row.status}</span></td>
+              <td>{row.attendanceId != null
+                ? <button className="btn btn-outline btn-tiny" type="button" onClick={() => openCorrection(row)}>Request Correction</button>
+                : <span className="muted-text">No recorded check-in</span>}
+              </td>
+            </tr>)}
+            {filtered.length === 0 && <tr><td colSpan={6}>No attendance records match your filters.</td></tr>}
+          </tbody>
+        </table>
+      </div>}
+      <p className="footnote">Scheduled dates without check-ins are shown as provisional absences after shift end. Statuses are evaluated for the last 90 days. Older saved check-ins are listed as Recorded (Outside Status Window). Approved leave and holidays are not included yet.</p>
+    </Card>
 
-        <StatCard
-          label="Late Days"
-          value={late}
-          icon={Clock3}
-          tone="amber"
-        />
-
-        <StatCard
-          label="Absent Days"
-          value={absent}
-          icon={XCircle}
-          tone="red"
-        />
-
-        <StatCard
-          label="Total Recorded Hours"
-          value={formatHours(hours)}
-          icon={Hourglass}
-          tone="blue"
-        />
-      </div>
-
-      {/* Filters */}
-      <Card className="filter-card">
-        <div className="filters">
-
-          <div className="field">
-            <label htmlFor="history-month">
-              Month
-            </label>
-
-            <select
-              id="history-month"
-              value={month}
-              onChange={e => setMonth(e.target.value)}
-            >
-              <option value="All">All months</option>
-
-              {months.map(m => (
-                <option key={m} value={m}>
-                  {new Date(
-                    `${m}-01T12:00:00`
-                  ).toLocaleDateString("en-GB", {
-                    month: "long",
-                    year: "numeric"
-                  })}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="field">
-            <label htmlFor="history-status">
-              Status
-            </label>
-
-            <select
-              id="history-status"
-              value={status}
-              onChange={e => setStatus(e.target.value)}
-            >
-              <option>All</option>
-              <option>Present</option>
-              <option>Late</option>
-              <option>Absent</option>
-            </select>
-          </div>
-
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => {
-              setMonth("All");
-              setStatus("All");
-            }}
-          >
-            Clear Filters
+    {selected && <Dialog title="Request Attendance Correction" onClose={closeCorrection}>
+      <form onSubmit={submit}>
+        <p className="muted-text">Attendance date: <strong>{fullDate(selected.date)}</strong></p>
+        <div className="field">
+          <label htmlFor="correction-reason">Reason for correction</label>
+          <textarea id="correction-reason" value={reason} onChange={e => setReason(e.target.value)}
+            rows={4} minLength={10} maxLength={1000} required disabled={savingRequest}
+            placeholder="Explain what is incorrect and the correct time you believe applies..."/>
+        </div>
+        {requestError && <p role="alert" style={{ color: "#c62828" }}>{requestError}</p>}
+        <div className="dialog-actions">
+          <button type="button" className="btn btn-outline" disabled={savingRequest} onClick={closeCorrection}>Cancel</button>
+          <button className="btn btn-primary" type="submit" disabled={savingRequest}>
+            <FilePenLine size={16}/>{savingRequest ? "Submitting..." : "Submit Request"}
           </button>
-
         </div>
-      </Card>
-
-      {/* Attendance records */}
-      <Card>
-        <SectionTitle icon={CalendarDays}>
-          Attendance Records
-        </SectionTitle>
-
-        {loading && (
-          <p>Loading attendance records...</p>
-        )}
-
-        {error && (
-          <p role="alert" style={{ color: "#c62828" }}>
-            {error}
-          </p>
-        )}
-
-        {requestSuccess && (
-          <p role="status" style={{ color: "#167d46" }}>
-            {requestSuccess}
-          </p>
-        )}
-
-        {!loading && !error && (
-          <AttendanceTable
-            rows={filtered}
-            showAction
-            onCorrection={openCorrection}
-          />
-        )}
-
-        <p className="footnote">
-          Records are read-only. Correction requests
-          are sent to a manager for review.
-        </p>
-      </Card>
-
-      {/* Correction request dialog */}
-      {selected && (
-        <Dialog
-          title="Request Attendance Correction"
-          onClose={closeCorrection}
-        >
-          <form onSubmit={submit}>
-
-            <p className="muted-text">
-              Attendance date:{" "}
-              <strong>
-                {fullDate(selected.date)}
-              </strong>
-            </p>
-
-            <div className="field">
-              <label htmlFor="correction-reason">
-                Reason for correction
-              </label>
-
-              <textarea
-                id="correction-reason"
-                value={reason}
-                onChange={e => setReason(e.target.value)}
-                rows={4}
-                placeholder="Explain what is incorrect and the time you believe is correct..."
-                required
-                minLength={10}
-                maxLength={1000}
-                disabled={savingRequest}
-              />
-            </div>
-
-            {/* Display backend errors */}
-            {requestError && (
-              <p
-                role="alert"
-                style={{ color: "#c62828" }}
-              >
-                {requestError}
-              </p>
-            )}
-
-            <div className="dialog-actions">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={closeCorrection}
-                disabled={savingRequest}
-              >
-                Cancel
-              </button>
-
-              <button
-                className="btn btn-primary"
-                type="submit"
-                disabled={savingRequest}
-              >
-                <FilePenLine size={16} />
-
-                {savingRequest
-                  ? "Submitting..."
-                  : "Submit Request"}
-              </button>
-            </div>
-
-          </form>
-        </Dialog>
-      )}
-    </>
-  );
+      </form>
+    </Dialog>}
+  </>;
 }
