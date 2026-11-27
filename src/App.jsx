@@ -13,7 +13,6 @@ import ManagerDashboard from './pages/ManagerDashboard.jsx';
 import MyTeam from './pages/MyTeam.jsx';
 import ManagerAttendance from './pages/ManagerAttendance.jsx';
 import Requests from './pages/Requests.jsx';
-import Reports from './pages/Reports.jsx';
 import ManagerProfile from './pages/ManagerProfile.jsx';
 import WorkplaceQR from "./pages/WorkplaceQR.jsx";
 import AttendanceScan from "./pages/AttendanceScan.jsx";
@@ -22,6 +21,7 @@ import WorkplaceQRDisplay from "./pages/WorkplaceQRDisplay";
 import EmployeeCorrections from "./pages/EmployeeCorrections.jsx";
 import WorkSchedules from "./pages/WorkSchedules.jsx";
 import DailyAttendanceStatus from "./pages/DailyAttendanceStatus.jsx";
+import MonthlyAttendanceReports from "./pages/MonthlyAttendanceReports.jsx";
 
 function RoleGate({role}){
   const {role:activeRole}=useDemo();
@@ -87,8 +87,11 @@ export default function App(){
       <Route path="team" element={<MyTeam/>}/>
       <Route path="attendance" element={<ManagerAttendance/>}/>
       <Route path="requests" element={<Requests/>}/>
-      <Route path="reports" element={<Reports/>}/>
       <Route path="profile" element={<ManagerProfile/>}/>
+      <Route
+  path="reports"
+  element={<MonthlyAttendanceReports />}
+/>
       <Route
   path="schedules"
   element={<WorkSchedules />}
