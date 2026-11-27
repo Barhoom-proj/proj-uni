@@ -115,6 +115,7 @@ export default function EmployeeDashboard() {
         <span className="eyebrow">EMPLOYEE DASHBOARD</span>
         <h1>Welcome back, <span className="accent">{account?.displayName || "Employee"}!</span></h1>
         <p>Track your attendance, scan the office QR code, and view your records.</p>
+        <Link to="/employee/leave" className="btn btn-outline">My Leave Requests</Link>
       </div>
       <div className="welcome-landscape" aria-hidden="true"><span/><span/><span/></div>
     </div>

@@ -1,3 +1,4 @@
+import { CalendarDays } from "lucide-react";
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Bell, ChartNoAxesCombined, ChevronDown, ClipboardList, ClipboardCheck, Clock, Cloud, FileBarChart2, LayoutDashboard, LogOut, Menu, QrCode, Search, ShieldCheck, UserRound, UsersRound, X } from 'lucide-react';
@@ -9,6 +10,11 @@ const employeeNav=[
   {to:'/employee/scan',label:'Scan QR',icon:QrCode},
   {to:'/employee/history',label:'Attendance History',icon:ClipboardList},
   {to:'/employee/profile',label:'Profile',icon:UserRound},
+  {
+  to: "/employee/leave",
+  label: "Leave Requests",
+  icon: CalendarDays
+}
 ];
 const managerNav=[
   {to:'/manager/dashboard',label:'Dashboard',icon:LayoutDashboard},
@@ -17,6 +23,16 @@ const managerNav=[
   {to:'/manager/requests',label:'Requests',icon:ClipboardList},
   {to:'/manager/reports',label:'Reports',icon:ChartNoAxesCombined},
   {to:'/manager/profile',label:'Profile',icon:UserRound},
+  {
+  to: "/manager/leave",
+  label: "Leave Requests",
+  icon: CalendarDays
+},
+{
+  to: "/manager/holidays",
+  label: "Holidays",
+  icon: CalendarDays
+}
 ];
 
 export default function Layout(){

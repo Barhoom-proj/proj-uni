@@ -17,6 +17,8 @@ function statusTone(status) {
   if (status === "Present") return "#167d46";
   if (status === "Late") return "#a96300";
   if (status === "Absent") return "#c62828";
+  if (status === "On Leave") return "#205cbd";
+  if (status === "Holiday") return "#713bb5";
   return "#526174";
 }
 
@@ -136,7 +138,10 @@ export default function AttendanceHistory() {
         <h1>Attendance History</h1>
         <p>Review your schedule-based attendance status, recorded hours, and corrections.</p>
       </div>
-      <Link className="btn btn-outline" to="/employee/corrections">My Correction Requests</Link>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Link className="btn btn-outline" to="/employee/leave">Request Leave</Link>
+        <Link className="btn btn-outline" to="/employee/corrections">My Correction Requests</Link>
+      </div>
     </div>
 
     <div className="stat-grid four">
@@ -197,7 +202,7 @@ export default function AttendanceHistory() {
           </tbody>
         </table>
       </div>}
-      <p className="footnote">Scheduled dates without check-ins are shown as provisional absences after shift end. Statuses are evaluated for the last 90 days. Older saved check-ins are listed as Recorded (Outside Status Window). Approved leave and holidays are not included yet.</p>
+      <p className="footnote">Scheduled dates without check-ins are shown as provisional absences after shift end. Statuses are evaluated for the last 90 days. Older saved check-ins are listed as Recorded (Outside Status Window). Approved leave and configured holidays are excluded from Absent counts.</p>
     </Card>
 
     {selected && <Dialog title="Request Attendance Correction" onClose={closeCorrection}>

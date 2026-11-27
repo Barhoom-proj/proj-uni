@@ -22,6 +22,10 @@ import EmployeeCorrections from "./pages/EmployeeCorrections.jsx";
 import WorkSchedules from "./pages/WorkSchedules.jsx";
 import DailyAttendanceStatus from "./pages/DailyAttendanceStatus.jsx";
 import MonthlyAttendanceReports from "./pages/MonthlyAttendanceReports.jsx";
+import EmployeeLeaveRequests from "./pages/EmployeeLeaveRequests.jsx";
+import ManagerLeaveRequests from "./pages/ManagerLeaveRequests.jsx";
+import ManagerHolidays from "./pages/ManagerHolidays.jsx";
+
 
 function RoleGate({role}){
   const {role:activeRole}=useDemo();
@@ -73,6 +77,11 @@ export default function App(){
       <Route path="scan"element={<ScanInstructions />}/>
       <Route path="confirmation" element={<AttendanceConfirmation/>}/>
       <Route path="history" element={<AttendanceHistory/>}/>
+<Route
+  path="leave"
+  element={<EmployeeLeaveRequests />}
+/>
+
       <Route
   path="corrections"
   element={<EmployeeCorrections />}
@@ -88,6 +97,15 @@ export default function App(){
       <Route path="attendance" element={<ManagerAttendance/>}/>
       <Route path="requests" element={<Requests/>}/>
       <Route path="profile" element={<ManagerProfile/>}/>
+<Route
+  path="leave"
+  element={<ManagerLeaveRequests />}
+/>
+
+<Route
+  path="holidays"
+  element={<ManagerHolidays />}
+/>
       <Route
   path="reports"
   element={<MonthlyAttendanceReports />}
